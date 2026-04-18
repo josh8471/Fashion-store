@@ -27,10 +27,20 @@ export async function GET(req: NextRequest) {
   }
 }
 
+const VALID_STATUSES = ["pending", "confirmed", "processing", "shipped", "delivered", "cancelled"];
+
 export async function PATCH(req: NextRequest) {
   try {
-    await connectDB();
     const { orderId, status } = await req.json();
+
+    if (!orderId || !status) {
+      return Response.json({ error: "orderId and status are required" }, { status: 400 });
+    }
+    if (!VALID_STATUSES.includes(status)) {
+      return Response.json({ error: `Invalid status. Must be one of: ${VALID_STATUSES.join(", ")}` }, { status: 400 });
+    }
+
+    await connectDB();
     const order = await Order.findByIdAndUpdate(orderId, { status }, { new: true });
     if (!order) return Response.json({ error: "Not found" }, { status: 404 });
     return Response.json({ data: order });

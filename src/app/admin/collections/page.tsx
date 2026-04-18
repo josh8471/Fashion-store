@@ -12,11 +12,12 @@ export default function AdminCollectionsPage() {
   const [showForm, setShowForm] = useState(false);
   const [form, setForm] = useState(EMPTY);
   const [saving, setSaving] = useState(false);
-  const [message, setMessage] = useState<string | null>(null);
+  const [message, setMessage] = useState<{ text: string; ok: boolean } | null>(null);
+  const [deleteId, setDeleteId] = useState<string | null>(null);
 
   const fetchCollections = () => {
     setLoading(true);
-    fetch("/api/collections")
+    fetch("/api/collections?limit=100")
       .then((r) => r.json())
       .then((j) => setCollections(j.data || []))
       .finally(() => setLoading(false));
@@ -34,25 +35,45 @@ export default function AdminCollectionsPage() {
     });
     setSaving(false);
     if (res.ok) {
-      setMessage("Collection created!");
+      setMessage({ text: "Collection created!", ok: true });
       setForm(EMPTY);
       setShowForm(false);
       fetchCollections();
     } else {
-      setMessage("Failed to save.");
+      setMessage({ text: "Failed to save.", ok: false });
     }
+  };
+
+  const handleDelete = async (id: string) => {
+    await fetch(`/api/collections/${id}`, {
+      method: "PUT",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({ isActive: false }),
+    });
+    setDeleteId(null);
+    fetchCollections();
   };
 
   return (
     <div className="p-8">
       <div className="flex items-center justify-between mb-8">
-        <h1 className="text-3xl font-light text-zinc-900">Collections</h1>
-        <button onClick={() => setShowForm((v) => !v)} className="bg-zinc-900 text-white text-xs tracking-widest uppercase px-6 py-3 hover:bg-zinc-800 transition-colors">
+        <div>
+          <p className="text-xs tracking-[0.3em] uppercase text-zinc-400 mb-1">Catalogue</p>
+          <h1 className="text-3xl font-light text-zinc-900">Collections</h1>
+        </div>
+        <button
+          onClick={() => setShowForm((v) => !v)}
+          className="bg-zinc-900 text-white text-xs tracking-widest uppercase px-6 py-3 hover:bg-zinc-800 transition-colors"
+        >
           {showForm ? "Cancel" : "+ Add Collection"}
         </button>
       </div>
 
-      {message && <div className="mb-4 text-sm text-zinc-700 bg-zinc-100 px-4 py-3">{message}</div>}
+      {message && (
+        <div className={`mb-4 text-sm px-4 py-3 ${message.ok ? "bg-green-50 text-green-700" : "bg-red-50 text-red-600"}`}>
+          {message.text}
+        </div>
+      )}
 
       {showForm && (
         <form onSubmit={handleSave} className="bg-white border border-zinc-100 p-8 mb-8 space-y-5 max-w-lg">
@@ -60,7 +81,7 @@ export default function AdminCollectionsPage() {
           {[
             { name: "name", label: "Name", type: "text", required: true },
             { name: "description", label: "Description", type: "text" },
-            { name: "image", label: "Image URL", type: "text" },
+            { name: "image", label: "Cover Image URL", type: "text" },
             { name: "sortOrder", label: "Sort Order", type: "number" },
           ].map((f) => (
             <div key={f.name}>
@@ -80,23 +101,48 @@ export default function AdminCollectionsPage() {
         </form>
       )}
 
-      <div className="bg-white border border-zinc-100">
+      {deleteId && (
+        <div className="fixed inset-0 bg-black/40 z-50 flex items-center justify-center p-4">
+          <div className="bg-white p-8 max-w-sm w-full shadow-xl">
+            <h3 className="text-lg font-light text-zinc-900 mb-2">Remove collection?</h3>
+            <p className="text-sm text-zinc-500 mb-6">It will be hidden from the store.</p>
+            <div className="flex gap-3">
+              <button onClick={() => handleDelete(deleteId)} className="flex-1 bg-red-600 text-white text-xs tracking-widest uppercase py-3 hover:bg-red-700 transition-colors">
+                Remove
+              </button>
+              <button onClick={() => setDeleteId(null)} className="flex-1 border border-zinc-200 text-zinc-700 text-xs tracking-widest uppercase py-3 hover:bg-zinc-50 transition-colors">
+                Cancel
+              </button>
+            </div>
+          </div>
+        </div>
+      )}
+
+      <div className="bg-white border border-zinc-100 overflow-x-auto">
         <table className="w-full text-sm">
           <thead>
             <tr className="border-b border-zinc-100 bg-zinc-50">
-              {["Name", "Slug", "Sort Order", "Status"].map((h) => (
-                <th key={h} className="text-left px-4 py-3 text-[10px] tracking-widest uppercase text-zinc-500 font-normal">{h}</th>
+              {["Name", "Slug", "Sort Order", "Status", ""].map((h, i) => (
+                <th key={i} className="text-left px-4 py-3 text-[10px] tracking-widest uppercase text-zinc-500 font-normal">{h}</th>
               ))}
             </tr>
           </thead>
           <tbody>
             {collections.map((c) => (
-              <tr key={c._id} className="border-b border-zinc-50">
+              <tr key={c._id} className="border-b border-zinc-50 hover:bg-zinc-50 transition-colors">
                 <td className="px-4 py-3 text-zinc-900">{c.name}</td>
                 <td className="px-4 py-3 text-zinc-400 font-mono text-xs">{c.slug}</td>
                 <td className="px-4 py-3 text-zinc-500">{c.sortOrder}</td>
                 <td className="px-4 py-3">
                   <span className="text-[10px] tracking-widest uppercase px-2 py-1 bg-green-50 text-green-700">Active</span>
+                </td>
+                <td className="px-4 py-3 text-right">
+                  <button
+                    onClick={() => setDeleteId(c._id)}
+                    className="text-xs text-red-400 hover:text-red-700 underline underline-offset-2"
+                  >
+                    Remove
+                  </button>
                 </td>
               </tr>
             ))}

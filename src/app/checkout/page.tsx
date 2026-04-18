@@ -2,6 +2,7 @@
 
 import { useRef, useState, useEffect } from "react";
 import { useRouter } from "next/navigation";
+import { useSession } from "next-auth/react";
 import gsap from "gsap";
 import { useGSAP } from "@gsap/react";
 import { useCart } from "@/context/CartContext";
@@ -44,6 +45,7 @@ export default function CheckoutPage() {
   const pageRef = useRef<HTMLDivElement>(null);
   const router = useRouter();
   const { items, subtotal, clearCart } = useCart();
+  const { data: session } = useSession();
   const [step, setStep] = useState(0);
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState<string | null>(null);
@@ -155,6 +157,16 @@ export default function CheckoutPage() {
   useEffect(() => {
     if (items.length === 0) router.push("/cart");
   }, [items.length, router]);
+
+  useEffect(() => {
+    if (session?.user) {
+      setForm((prev) => ({
+        ...prev,
+        name: session.user?.name || prev.name,
+        email: session.user?.email || prev.email,
+      }));
+    }
+  }, [session]);
 
   if (items.length === 0) return null;
 

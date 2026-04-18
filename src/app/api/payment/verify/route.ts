@@ -9,8 +9,12 @@ export async function POST(req: NextRequest) {
       razorpay_order_id,
       razorpay_payment_id,
       razorpay_signature,
-      orderId, // our MongoDB order _id
+      orderId,
     } = await req.json();
+
+    if (!razorpay_order_id || !razorpay_payment_id || !razorpay_signature || !orderId) {
+      return Response.json({ error: "Missing required payment fields" }, { status: 400 });
+    }
 
     const isValid = verifyRazorpaySignature(
       razorpay_order_id,

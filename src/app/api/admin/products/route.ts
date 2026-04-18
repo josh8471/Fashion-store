@@ -1,8 +1,8 @@
 import { NextRequest } from "next/server";
 import { connectDB } from "@/lib/mongodb";
 import Product from "@/lib/models/Product";
+import { slugify } from "@/lib/utils";
 
-// Admin: get all products (including inactive)
 export async function GET(req: NextRequest) {
   try {
     await connectDB();
@@ -11,11 +11,7 @@ export async function GET(req: NextRequest) {
     const limit = parseInt(searchParams.get("limit") || "20");
 
     const [data, total] = await Promise.all([
-      Product.find({})
-        .sort({ createdAt: -1 })
-        .skip((page - 1) * limit)
-        .limit(limit)
-        .lean(),
+      Product.find({}).sort({ createdAt: -1 }).skip((page - 1) * limit).limit(limit).lean(),
       Product.countDocuments({}),
     ]);
 
@@ -23,5 +19,21 @@ export async function GET(req: NextRequest) {
   } catch (err) {
     console.error(err);
     return Response.json({ error: "Failed to fetch products" }, { status: 500 });
+  }
+}
+
+export async function POST(req: NextRequest) {
+  try {
+    await connectDB();
+    const body = await req.json();
+    if (!body.name?.trim() || !body.price || !body.category?.trim()) {
+      return Response.json({ error: "Name, price and category are required" }, { status: 400 });
+    }
+    body.slug = slugify(body.name);
+    const product = await Product.create(body);
+    return Response.json({ data: product }, { status: 201 });
+  } catch (err) {
+    console.error(err);
+    return Response.json({ error: "Failed to create product" }, { status: 500 });
   }
 }

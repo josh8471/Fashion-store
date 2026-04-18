@@ -3,6 +3,7 @@
 import { useRef, useEffect, useState } from "react";
 import Link from "next/link";
 import { usePathname } from "next/navigation";
+import { useSession, signOut } from "next-auth/react";
 import gsap from "gsap";
 import { useGSAP } from "@gsap/react";
 import { useCart } from "@/context/CartContext";
@@ -19,6 +20,7 @@ const NAV_LINKS = [
 export default function Navbar() {
   const navRef = useRef<HTMLElement>(null);
   const { itemCount, toggleCart } = useCart();
+  const { data: session } = useSession();
   const pathname = usePathname();
   const [menuOpen, setMenuOpen] = useState(false);
   const [scrolled, setScrolled] = useState(false);
@@ -105,11 +107,26 @@ export default function Navbar() {
               </svg>
             </Link>
 
-            <Link href="/account" className="text-zinc-500 hover:text-zinc-900 transition-colors hidden md:block" aria-label="Account">
-              <svg xmlns="http://www.w3.org/2000/svg" className="h-5 w-5" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={1.5}>
-                <path strokeLinecap="round" strokeLinejoin="round" d="M16 7a4 4 0 11-8 0 4 4 0 018 0zM12 14a7 7 0 00-7 7h14a7 7 0 00-7-7z" />
-              </svg>
-            </Link>
+            {session ? (
+              <div className="hidden md:flex items-center gap-3">
+                <Link href="/account" className="text-xs tracking-widest uppercase text-zinc-500 hover:text-zinc-900 transition-colors">
+                  {session.user?.name?.split(" ")[0]}
+                </Link>
+                <button
+                  onClick={() => signOut({ callbackUrl: "/" })}
+                  className="text-xs tracking-widest uppercase text-zinc-400 hover:text-zinc-900 transition-colors"
+                  aria-label="Sign out"
+                >
+                  Sign Out
+                </button>
+              </div>
+            ) : (
+              <Link href="/login" className="text-zinc-500 hover:text-zinc-900 transition-colors hidden md:block" aria-label="Account">
+                <svg xmlns="http://www.w3.org/2000/svg" className="h-5 w-5" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={1.5}>
+                  <path strokeLinecap="round" strokeLinejoin="round" d="M16 7a4 4 0 11-8 0 4 4 0 018 0zM12 14a7 7 0 00-7 7h14a7 7 0 00-7-7z" />
+                </svg>
+              </Link>
+            )}
 
             <button
               onClick={toggleCart}
