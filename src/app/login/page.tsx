@@ -3,7 +3,7 @@
 import { useRef, useState } from "react";
 import Link from "next/link";
 import { useRouter, useSearchParams } from "next/navigation";
-import { signIn } from "next-auth/react";
+import { signIn, getSession } from "next-auth/react";
 import gsap from "gsap";
 import { useGSAP } from "@gsap/react";
 import { SplitText } from "gsap/SplitText";
@@ -46,7 +46,10 @@ function LoginForm() {
     if (res?.error) {
       setError("Invalid email or password.");
     } else {
-      router.push(callbackUrl);
+      const session = await getSession();
+      const role = (session?.user as { role?: string } | undefined)?.role;
+      const target = role === "admin" ? "/admin" : callbackUrl;
+      router.push(target);
       router.refresh();
     }
   };

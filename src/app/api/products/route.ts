@@ -9,13 +9,13 @@ export async function GET(req: NextRequest) {
     const featured = searchParams.get("featured");
     const collection = searchParams.get("collection");
     const category = searchParams.get("category");
-    const limit = parseInt(searchParams.get("limit") || "20");
-    const page = parseInt(searchParams.get("page") || "1");
+    const limit = Math.min(100, Math.max(1, parseInt(searchParams.get("limit") || "20")));
+    const page = Math.max(1, parseInt(searchParams.get("page") || "1"));
     const sort = searchParams.get("sort") || "createdAt";
 
     const filter: Record<string, unknown> = { isActive: true };
     if (featured === "true") filter.isFeatured = true;
-    if (collection) filter.collectionId = collection;
+    if (collection && /^[a-f\d]{24}$/i.test(collection)) filter.collectionId = collection;
     if (category) filter.category = category;
 
     const sortMap: Record<string, [string, 1 | -1][]> = {
@@ -35,20 +35,7 @@ export async function GET(req: NextRequest) {
     ]);
 
     return Response.json({ data, total, page, pages: Math.ceil(total / limit) });
-  } catch (err) {
-    console.error(err);
+  } catch {
     return Response.json({ error: "Failed to fetch products" }, { status: 500 });
-  }
-}
-
-export async function POST(req: NextRequest) {
-  try {
-    await connectDB();
-    const body = await req.json();
-    const product = await Product.create(body);
-    return Response.json({ data: product }, { status: 201 });
-  } catch (err) {
-    console.error(err);
-    return Response.json({ error: "Failed to create product" }, { status: 500 });
   }
 }

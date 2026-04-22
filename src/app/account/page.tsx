@@ -29,7 +29,14 @@ export default function AccountPage() {
 
   useEffect(() => {
     if (status === "unauthenticated") router.push("/login");
-  }, [status, router]);
+    if (status === "authenticated") {
+      const role = (session?.user as { role?: string } | undefined)?.role;
+      if (role === "admin") {
+        router.replace("/admin");
+        return;
+      }
+    }
+  }, [status, session, router]);
 
   useEffect(() => {
     if (!session?.user?.email) return;

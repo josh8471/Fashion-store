@@ -2,13 +2,18 @@ import { NextRequest } from "next/server";
 import { connectDB } from "@/lib/mongodb";
 import Product from "@/lib/models/Product";
 import { slugify } from "@/lib/utils";
+import { requireAdmin } from "@/lib/authGuard";
+import { productCreateSchema, validationError } from "@/lib/validation";
 
 export async function GET(req: NextRequest) {
+  const guard = await requireAdmin();
+  if (!guard.ok) return guard.response;
+
   try {
     await connectDB();
     const { searchParams } = new URL(req.url);
-    const page = parseInt(searchParams.get("page") || "1");
-    const limit = parseInt(searchParams.get("limit") || "20");
+    const page = Math.max(1, parseInt(searchParams.get("page") || "1"));
+    const limit = Math.min(100, Math.max(1, parseInt(searchParams.get("limit") || "20")));
 
     const [data, total] = await Promise.all([
       Product.find({}).sort({ createdAt: -1 }).skip((page - 1) * limit).limit(limit).lean(),
@@ -16,24 +21,26 @@ export async function GET(req: NextRequest) {
     ]);
 
     return Response.json({ data, total, page, pages: Math.ceil(total / limit) });
-  } catch (err) {
-    console.error(err);
+  } catch {
     return Response.json({ error: "Failed to fetch products" }, { status: 500 });
   }
 }
 
 export async function POST(req: NextRequest) {
+  const guard = await requireAdmin();
+  if (!guard.ok) return guard.response;
+
+  const parsed = productCreateSchema.safeParse(await req.json().catch(() => null));
+  if (!parsed.success) return validationError(parsed.error);
+
   try {
     await connectDB();
-    const body = await req.json();
-    if (!body.name?.trim() || !body.price || !body.category?.trim()) {
-      return Response.json({ error: "Name, price and category are required" }, { status: 400 });
-    }
-    body.slug = slugify(body.name);
-    const product = await Product.create(body);
+    const product = await Product.create({
+      ...parsed.data,
+      slug: slugify(parsed.data.name),
+    });
     return Response.json({ data: product }, { status: 201 });
-  } catch (err) {
-    console.error(err);
+  } catch {
     return Response.json({ error: "Failed to create product" }, { status: 500 });
   }
 }

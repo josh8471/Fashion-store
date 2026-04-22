@@ -2,8 +2,12 @@ import { connectDB } from "@/lib/mongodb";
 import Order from "@/lib/models/Order";
 import Product from "@/lib/models/Product";
 import User from "@/lib/models/User";
+import { requireAdmin } from "@/lib/authGuard";
 
 export async function GET() {
+  const guard = await requireAdmin();
+  if (!guard.ok) return guard.response;
+
   try {
     await connectDB();
     const [orderStats, totalProducts, totalUsers] = await Promise.all([
@@ -32,8 +36,7 @@ export async function GET() {
       totalProducts,
       totalUsers,
     });
-  } catch (err) {
-    console.error(err);
+  } catch {
     return Response.json({ error: "Failed to fetch stats" }, { status: 500 });
   }
 }

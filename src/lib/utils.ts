@@ -11,13 +11,17 @@ export function verifyRazorpaySignature(
   razorpayPaymentId: string,
   razorpaySignature: string
 ): boolean {
-  const secret = process.env.RAZORPAY_KEY_SECRET as string;
+  const secret = process.env.RAZORPAY_KEY_SECRET;
+  if (!secret) throw new Error("RAZORPAY_KEY_SECRET is not set");
   const body = `${razorpayOrderId}|${razorpayPaymentId}`;
   const expectedSignature = crypto
     .createHmac("sha256", secret)
     .update(body)
     .digest("hex");
-  return expectedSignature === razorpaySignature;
+  const expected = Buffer.from(expectedSignature, "hex");
+  const received = Buffer.from(razorpaySignature, "hex");
+  if (expected.length !== received.length) return false;
+  return crypto.timingSafeEqual(expected, received);
 }
 
 export function formatPrice(amount: number): string {

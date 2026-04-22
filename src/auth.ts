@@ -46,11 +46,11 @@ export const { handlers, auth, signIn, signOut } = NextAuth({
         try {
           await connectDB();
           if (!user.email) return false;
-          const existing = await User.findOne({ email: user.email });
+          const existing = await User.findOne({ email: user.email.toLowerCase() });
           if (!existing) {
             await User.create({
               name: user.name ?? "Google User",
-              email: user.email,
+              email: user.email.toLowerCase(),
               role: "customer",
             });
           }
@@ -60,28 +60,30 @@ export const { handlers, auth, signIn, signOut } = NextAuth({
       }
       return true;
     },
-    async jwt({ token, user, account, profile }) {
-      // Credentials sign-in: user object has role from authorize()
+    async jwt({ token, user, account, profile, trigger }) {
       if (user) {
         token.id = user.id;
         token.role = (user as { role?: string }).role ?? "customer";
         token.name = user.name;
         token.email = user.email;
       }
-      // Google sign-in: fetch role from DB (Google profile has no role)
       if (account?.provider === "google") {
         if (profile) {
           token.name = (profile as { name?: string }).name ?? token.name;
           token.email = (profile as { email?: string }).email ?? token.email;
           token.picture = (profile as { picture?: string }).picture;
         }
-        if (token.email) {
-          await connectDB();
-          const dbUser = await User.findOne({ email: token.email }).lean() as { _id: { toString(): string }; role?: string } | null;
-          if (dbUser) {
-            token.id = dbUser._id.toString();
-            token.role = dbUser.role ?? "customer";
-          }
+      }
+      // Always refresh role from DB on sign-in or explicit update.
+      // Prevents stale JWTs from retaining outdated roles.
+      if ((account || trigger === "update") && token.email) {
+        await connectDB();
+        const dbUser = await User.findOne({ email: (token.email as string).toLowerCase() })
+          .select("_id role")
+          .lean() as { _id: { toString(): string }; role?: string } | null;
+        if (dbUser) {
+          token.id = dbUser._id.toString();
+          token.role = dbUser.role ?? "customer";
         }
       }
       return token;

@@ -2,59 +2,45 @@ import { NextRequest } from "next/server";
 import { connectDB } from "@/lib/mongodb";
 import Order from "@/lib/models/Order";
 import { generateOrderNumber } from "@/lib/utils";
+import { orderCreateSchema, validationError } from "@/lib/validation";
+import { getSessionUser } from "@/lib/authGuard";
 
 export async function POST(req: NextRequest) {
+  const parsed = orderCreateSchema.safeParse(await req.json().catch(() => null));
+  if (!parsed.success) return validationError(parsed.error);
+
+  // Server-side total verification: prevent client-side tampering with prices.
+  const computedSubtotal = parsed.data.items.reduce(
+    (s, i) => s + i.price * i.quantity,
+    0
+  );
+  const computedTotal = computedSubtotal + parsed.data.shippingCost;
+  // Allow rounding drift up to 1 unit.
+  if (Math.abs(computedSubtotal - parsed.data.subtotal) > 1 || Math.abs(computedTotal - parsed.data.total) > 1) {
+    return Response.json({ error: "Order totals do not match items" }, { status: 400 });
+  }
+
   try {
-    const body = await req.json();
-
-    const { customer, shippingAddress, items, subtotal, shippingCost, total } = body;
-
-    if (!customer?.name?.trim() || !customer?.email?.trim() || !customer?.phone?.trim()) {
-      return Response.json({ error: "Customer name, email and phone are required" }, { status: 400 });
-    }
-    const emailRe = /^[^\s@]+@[^\s@]+\.[^\s@]+$/;
-    if (!emailRe.test(customer.email)) {
-      return Response.json({ error: "Invalid customer email" }, { status: 400 });
-    }
-    if (!shippingAddress?.line1?.trim() || !shippingAddress?.city?.trim() || !shippingAddress?.state?.trim() || !shippingAddress?.pincode?.trim()) {
-      return Response.json({ error: "Shipping address is incomplete" }, { status: 400 });
-    }
-    if (!Array.isArray(items) || items.length === 0) {
-      return Response.json({ error: "Order must have at least one item" }, { status: 400 });
-    }
-    for (const item of items) {
-      if (!item.productId || !item.name || !item.size || item.price == null || item.quantity == null) {
-        return Response.json({ error: "Each item must have productId, name, size, price and quantity" }, { status: 400 });
-      }
-      if (item.price < 0 || item.quantity < 1) {
-        return Response.json({ error: "Invalid item price or quantity" }, { status: 400 });
-      }
-    }
-    if (typeof subtotal !== "number" || typeof total !== "number" || total < 0) {
-      return Response.json({ error: "Invalid order totals" }, { status: 400 });
-    }
-
     await connectDB();
     const orderNumber = generateOrderNumber();
-    const order = await Order.create({ customer, shippingAddress, items, subtotal, shippingCost, total, orderNumber });
+    const order = await Order.create({ ...parsed.data, orderNumber });
     return Response.json({ data: order }, { status: 201 });
-  } catch (err) {
-    console.error("ORDER CREATE ERROR:", err);
-    const message = err instanceof Error ? err.message : "Unknown error";
-    return Response.json({ error: "Failed to create order", details: message }, { status: 500 });
+  } catch {
+    return Response.json({ error: "Failed to create order" }, { status: 500 });
   }
 }
 
-export async function GET(req: NextRequest) {
+export async function GET() {
+  const user = await getSessionUser();
+  if (!user) return Response.json({ error: "Unauthorized" }, { status: 401 });
+
   try {
     await connectDB();
-    const { searchParams } = new URL(req.url);
-    const email = searchParams.get("email");
-    const filter = email ? { "customer.email": email } : {};
-    const orders = await Order.find(filter).sort({ createdAt: -1 }).lean();
+    const orders = await Order.find({ "customer.email": user.email.toLowerCase() })
+      .sort({ createdAt: -1 })
+      .lean();
     return Response.json({ data: orders });
-  } catch (err) {
-    console.error(err);
+  } catch {
     return Response.json({ error: "Failed to fetch orders" }, { status: 500 });
   }
 }
