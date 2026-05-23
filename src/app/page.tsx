@@ -1,8 +1,11 @@
 import Hero from "@/components/home/Hero";
 import Marquee from "@/components/home/Marquee";
+import ValuesStrip from "@/components/home/ValuesStrip";
 import FeaturedCollections from "@/components/home/FeaturedCollections";
 import FeaturedProducts from "@/components/home/FeaturedProducts";
 import Editorial from "@/components/home/Editorial";
+import Testimonials from "@/components/home/Testimonials";
+import NewsletterCTA from "@/components/home/NewsletterCTA";
 import type { Collection, Product } from "@/types";
 
 async function getHomeData() {
@@ -26,9 +29,12 @@ export default async function HomePage() {
     <>
       <Hero />
       <Marquee />
+      <ValuesStrip />
       <FeaturedCollections collections={collections} />
       <FeaturedProducts products={products} />
       <Editorial />
+      <Testimonials />
+      <NewsletterCTA />
     </>
   );
 }

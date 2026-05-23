@@ -43,3 +43,19 @@ body {
   background: #18181b;
   color: #ffffff;
 }
+
+.font-serif {
+  font-family: var(--font-serif-display), "Cormorant Garamond", "Playfair Display", Georgia, serif;
+  font-feature-settings: "liga", "kern";
+}
+
+@media (prefers-reduced-motion: reduce) {
+  *,
+  *::before,
+  *::after {
+    animation-duration: 0.01ms !important;
+    animation-iteration-count: 1 !important;
+    transition-duration: 0.01ms !important;
+    scroll-behavior: auto !important;
+  }
+}
